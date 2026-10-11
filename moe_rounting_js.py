@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Routing-divergence ("U-shape") plot for Qwen1.5-MoE-A2.7B over all FLORES-200 languages.
+Routing-divergence ("U-shape") figure for Qwen1.5-MoE-A2.7B over all FLORES-200 languages.
 
 For every FLORES language and every MoE layer we measure how differently the router
 treats a sentence compared with its (parallel) English translation, following
@@ -13,29 +13,30 @@ and Appendix A.4:
                     (entropy-normalized Jensen-Shannon divergence, Eq. 6-8, natural log)
   * Div(lang, l)  = mean over sequences of D_H-JS (Eq. 2)
 
-One thin line is drawn per language (every line has its own colour); the legend lists only
-the 5 most widely spoken languages (excluding English, which is the reference).
+Figure (single PDF, two panels, no title, Times New Roman):
+  (a) JS divergence from English of every FLORES language (one thin line each),
+      with the 10 most widely spoken languages highlighted in the legend
+  (b) mean +- 1 std of the JS divergence across all languages
 
-Usage (run from the repo root)
-------------------------------
-    python eval/rounter-steering/Qwen1.5-MoE-A2.7B/plot_routing_divergence.py \\
+Usage (run from the repo root, CL_Hourglass/)
+---------------------------------------------
+    python moe_rounting_js.py \\
         --model_name_or_path Qwen/Qwen1.5-MoE-A2.7B \\
-        --flores_path data/processed_alignment/flores.json \\
+        --flores_path data/flores.json \\
         --num_samples 200 --batch_size 32 \\
-        --output_dir eval/rounter-steering/Qwen1.5-MoE-A2.7B/results/routing_divergence
+        --output_dir results/routing_divergence
 
-    # shade the layers you intervene in (e.g. 8-16) on the figure
+    # shade the layers you intervene in (e.g. 8-16)
     ... --mark_layers 8 16
 
     # re-draw the figure from the cached numbers (no model / GPU needed)
-    ... --plot_only --mark_layers 8 16
+    ... --plot_only
 
 Outputs (in --output_dir)
 -------------------------
     routing_divergence.json   per-language x per-layer divergence (also the resume checkpoint)
     routing_divergence.csv    same numbers as a table
-    routing_divergence_u_shape.png / .pdf
-    routing_divergence_mean_std.png / .pdf   mean (bold line) +- 1 std (faint band) across all languages
+    routing_divergence.pdf    the figure
 
 Resume: languages already present in routing_divergence.json (same settings) are skipped.
 Use --overwrite to start from scratch.
@@ -60,15 +61,22 @@ ENGLISH = "eng_Latn"
 LANG_KEY_RE = re.compile(r"^[a-z]{3}_[A-Z][a-z]{3}$")  # FLORES-200 codes, e.g. vie_Latn
 EPS = 1e-12
 
-# Five most widely spoken languages other than English (total speakers).
-DEFAULT_LEGEND_LANGS = ["zho_Hans", "hin_Deva", "spa_Latn", "fra_Latn", "arb_Arab"]
+# ----------------------------- figure font sizes ----------------------------- #
+LEGEND_FS = 16     # legend font size
+SUBFIG_FS = 28     # (a), (b) font size
+LABEL_FS = 24      # axis labels
+TICK_FS = 16       # tick labels
+
+# Ten most widely spoken languages other than English (total speakers).
+DEFAULT_LEGEND_LANGS = [
+    "zho_Hans", "hin_Deva", "spa_Latn", "fra_Latn", "arb_Arab",
+    "ben_Beng", "por_Latn", "rus_Cyrl", "urd_Arab", "ind_Latn",
+]
 LANG_NAMES = {
-    "zho_Hans": "Chinese (Mandarin)", "hin_Deva": "Hindi", "spa_Latn": "Spanish",
-    "fra_Latn": "French", "arb_Arab": "Arabic (MSA)", "ben_Beng": "Bengali",
-    "por_Latn": "Portuguese", "rus_Cyrl": "Russian", "ind_Latn": "Indonesian",
-    "jpn_Jpan": "Japanese", "deu_Latn": "German", "swh_Latn": "Swahili",
-    "vie_Latn": "Vietnamese", "kor_Hang": "Korean", "tur_Latn": "Turkish",
-    "tha_Thai": "Thai", "urd_Arab": "Urdu", "ita_Latn": "Italian",
+    "zho_Hans": "Chinese", "hin_Deva": "Hindi", "spa_Latn": "Spanish",
+    "fra_Latn": "French", "arb_Arab": "Arabic", "ben_Beng": "Bengali",
+    "por_Latn": "Portuguese", "rus_Cyrl": "Russian", "urd_Arab": "Urdu",
+    "ind_Latn": "Indonesian",
 }
 
 
@@ -237,89 +245,92 @@ def distinct_colors(n):
     return cols
 
 
-def plot_u_shape(div, layers, legend_langs, png_path, model_name, mark_layers=None, dpi=200):
+def set_style():
+    """Times New Roman everywhere, TrueType (Type 42) fonts embedded in the PDF."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "Times", "Liberation Serif", "Nimbus Roman", "DejaVu Serif"],
+        "mathtext.fontset": "stix",
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "axes.unicode_minus": False,
+    })
+    if not any(f.name == "Times New Roman" for f in font_manager.fontManager.ttflist):
+        print("[WARN] 'Times New Roman' not found by matplotlib; falling back to a Times-like serif font. "
+              "Install it (or delete ~/.matplotlib/fontlist-*.json to refresh the font cache).")
+    return plt
+
+
+def _style_axes(ax, x, mark_layers):
+    if mark_layers:
+        a, b = mark_layers
+        ax.axvspan(a - 0.5, b + 0.5, color="gray", alpha=0.13, zorder=0)
+    ax.set_xlabel("Layer", fontsize=LABEL_FS)
+    ax.set_ylabel("JS divergence", fontsize=LABEL_FS)
+    ax.set_xticks(x if len(x) <= 12 else x[1::2])
+    ax.set_xlim(x.min() - 0.5, x.max() + 0.5)
+    ax.tick_params(axis="both", labelsize=TICK_FS)
+    ax.grid(True, alpha=0.3)
+
+
+def _subcaption(ax, text):
+    """(a)/(b) caption centred under the axes, a fixed distance (in points) below the x-label."""
+    ax.annotate(text, xy=(0.5, 0.0), xycoords="axes fraction", xytext=(0, -88),
+                textcoords="offset points", ha="center", va="top", fontsize=SUBFIG_FS)
+
+
+def plot_figure(div, layers, legend_langs, pdf_path, mark_layers=None):
+    """Left: JS divergence of every language (+ top-10 spoken highlighted).
+    Right: mean +- 1 std (population std, ddof=0) over languages at each layer."""
+    plt = set_style()
 
     langs = list(div)
+    n_langs = len(langs)
     legend_langs = [l for l in legend_langs if l in div]
     others = sorted((l for l in langs if l not in legend_langs), key=lambda l: -np.nanmean(div[l]))
-    order = legend_langs + others  # legend languages get the first (most separated) colours
-    colors = dict(zip(order, distinct_colors(len(order))))
     x = np.asarray(layers)
 
-    fig, ax = plt.subplots(figsize=(13, 6.5))
+    tab10 = plt.get_cmap("tab10")
+    hl_colors = {l: tab10(i % 10) for i, l in enumerate(legend_langs)}
+    other_colors = dict(zip(others, distinct_colors(len(others))))
+
+    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(20, 7.5))
+    fig.subplots_adjust(left=0.07, right=0.99, top=0.86, bottom=0.2, wspace=0.22)
+
+    # ---- (a) all languages + highlighted top-10 ---------------------------------
     for l in others:
-        ax.plot(x, div[l], color=colors[l], lw=0.9, alpha=0.8, zorder=2)
+        ax_a.plot(x, div[l], color=other_colors[l], lw=0.8, alpha=0.65, zorder=2)
     for l in legend_langs:
-        ax.plot(x, div[l], color=colors[l], lw=2.6, marker="o", ms=3.5, zorder=5, label=lang_label(l))
+        ax_a.plot(x, div[l], color=hl_colors[l], lw=2.6, marker="o", ms=3.5, zorder=5,
+                  label=lang_label(l))
+    _style_axes(ax_a, x, mark_layers)
+    _subcaption(ax_a, f"(a) {n_langs} languages")
 
-    if mark_layers:
-        a, b = mark_layers
-        ax.axvspan(a - 0.5, b + 0.5, color="gray", alpha=0.13, zorder=0)
-        ax.text((a + b) / 2, 0.985, f"Steering layers {a}\u2013{b}", ha="center", va="top",
-                transform=ax.get_xaxis_transform(), fontsize=10, color="dimgray")
-
-    ax.set_xlabel("Layer Number", fontsize=12)
-    ax.set_ylabel("Mean JS-div (entropy-normalized)", fontsize=12)
-    ax.set_xticks(x if len(x) <= 30 else x[:: max(1, len(x) // 24)])
-    ax.set_xlim(x.min() - 0.5, x.max() + 0.5)
-    ax.grid(True, alpha=0.3)
-    ax.set_title(f"Routing Divergence from English, per Layer\n"
-                 f"[{model_name}] \u2013 {len(langs)} FLORES-200 languages", fontsize=14, fontweight="bold")
-
-    leg = ax.legend(title="Most widely spoken languages", loc="upper left",
-                    bbox_to_anchor=(1.01, 1.0), frameon=True, fontsize=10, title_fontsize=10)
-    leg.get_frame().set_alpha(0.95)
-    ax.text(1.01, 0.60, f"Thin lines: the other {len(others)} languages\n(each drawn in its own colour).\n"
-            "Divergence is measured against the\nparallel English FLORES sentence.",
-            transform=ax.transAxes, va="top", fontsize=9, color="dimgray")
-
-    fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
-    fig.savefig(os.path.splitext(png_path)[0] + ".pdf", bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_mean_std(div, layers, png_path, model_name, mark_layers=None, dpi=200):
-    """Per-layer mean divergence across ALL languages (bold line) with a faint +-1 std band.
-    std is the population std (ddof=0) over the languages, computed independently at each layer."""
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    arr = np.array([div[l] for l in div], dtype=np.float64)  # (n_langs, L)
-    mean = np.nanmean(arr, axis=0)
-    std = np.nanstd(arr, axis=0)
-    x = np.asarray(layers)
-    n_langs = arr.shape[0]
+    # ---- (b) mean +- std --------------------------------------------------------
+    arr = np.array([div[l] for l in langs], dtype=np.float64)  # (n_langs, L)
+    mean, std = np.nanmean(arr, axis=0), np.nanstd(arr, axis=0)
     color = "#1f77b4"
+    ax_b.fill_between(x, mean - std, mean + std, color=color, alpha=0.2, linewidth=0, zorder=2,
+                      label="\u00b11 std")
+    ax_b.plot(x, mean, color=color, lw=3.2, marker="o", ms=4.5, zorder=5, label="Mean")
+    _style_axes(ax_b, x, mark_layers)
+    _subcaption(ax_b, "(b) Mean \u00b1 std")
+    ax_b.legend(loc="upper center", fontsize=LEGEND_FS, frameon=True).get_frame().set_alpha(0.95)
 
-    fig, ax = plt.subplots(figsize=(13, 6.5))
-    ax.fill_between(x, mean - std, mean + std, color=color, alpha=0.2, linewidth=0, zorder=2,
-                    label=r"$\pm$1 std across languages")
-    ax.plot(x, mean, color=color, lw=3.2, marker="o", ms=4.5, zorder=5,
-            label=f"Mean over {n_langs} languages")
+    # ---- legend of the highlighted languages: one row above the panels ---------
+    handles, labels = ax_a.get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.875),
+                   ncol=min(5, len(handles)), fontsize=LEGEND_FS, frameon=True,
+                   columnspacing=1.6, handlelength=2.0).get_frame().set_alpha(0.95)
 
-    if mark_layers:
-        a, b = mark_layers
-        ax.axvspan(a - 0.5, b + 0.5, color="gray", alpha=0.13, zorder=0)
-        ax.text((a + b) / 2, 0.985, f"Steering layers {a}\u2013{b}", ha="center", va="top",
-                transform=ax.get_xaxis_transform(), fontsize=10, color="dimgray")
-
-    ax.set_xlabel("Layer Number", fontsize=12)
-    ax.set_ylabel("Mean JS-div (entropy-normalized)", fontsize=12)
-    ax.set_xticks(x if len(x) <= 30 else x[:: max(1, len(x) // 24)])
-    ax.set_xlim(x.min() - 0.5, x.max() + 0.5)
-    ax.grid(True, alpha=0.3)
-    ax.set_title(f"Routing Divergence from English, per Layer: mean \u00b1 std\n"
-                 f"[{model_name}] \u2013 {n_langs} FLORES-200 languages", fontsize=14, fontweight="bold")
-    ax.legend(loc="upper center", frameon=True, fontsize=10).get_frame().set_alpha(0.95)
-
-    fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
-    fig.savefig(os.path.splitext(png_path)[0] + ".pdf", bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -341,10 +352,10 @@ def print_layer_summary(div, layers):
 
 # ----------------------------------------------------------------------------- #
 def main():
-    p = argparse.ArgumentParser(description="U-shape routing divergence plot over FLORES-200")
+    p = argparse.ArgumentParser(description="Routing divergence figure over FLORES-200")
     p.add_argument("--model_name_or_path", default="Qwen/Qwen1.5-MoE-A2.7B")
-    p.add_argument("--flores_path", default="data/processed_alignment/flores.json")
-    p.add_argument("--output_dir", default="eval/rounter-steering/Qwen1.5-MoE-A2.7B/results/routing_divergence")
+    p.add_argument("--flores_path", default="data/flores.json")
+    p.add_argument("--output_dir", default="results/routing_divergence")
     p.add_argument("--num_samples", type=int, default=200,
                    help="#parallel FLORES sentences per language (0 = all). Same sentences for every language.")
     p.add_argument("--batch_size", type=int, default=32)
@@ -352,20 +363,17 @@ def main():
     p.add_argument("--dtype", default="bfloat16", choices=["bfloat16", "float16", "float32"])
     p.add_argument("--languages", nargs="+", default=None, help="subset of FLORES codes (default: all)")
     p.add_argument("--legend_langs", nargs="+", default=DEFAULT_LEGEND_LANGS,
-                   help="FLORES codes listed in the legend (default: 5 most widely spoken non-English languages)")
+                   help="FLORES codes highlighted in the legend (default: 10 most widely spoken non-English languages)")
     p.add_argument("--mark_layers", type=int, nargs=2, default=None, metavar=("START", "END"),
                    help="optionally shade this 1-indexed inclusive layer range, e.g. 8 16")
     p.add_argument("--plot_only", action="store_true", help="only re-draw from the cached json")
     p.add_argument("--overwrite", action="store_true", help="ignore the cache and recompute everything")
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--dpi", type=int, default=200)
     args = p.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
     json_path = os.path.join(args.output_dir, "routing_divergence.json")
-    png_path = os.path.join(args.output_dir, "routing_divergence_u_shape.png")
-    mean_std_path = os.path.join(args.output_dir, "routing_divergence_mean_std.png")
-    model_short = args.model_name_or_path.rstrip("/").split("/")[-1]
+    pdf_path = os.path.join(args.output_dir, "routing_divergence.pdf")
 
     cache = {"meta": {}, "layers": [], "divergence": {}}
     if os.path.exists(json_path) and not args.overwrite:
@@ -441,12 +449,10 @@ def main():
     if missing:
         print(f"[WARN] legend languages not available and skipped: {missing}")
 
-    plot_u_shape(div, layers, args.legend_langs, png_path, model_short, args.mark_layers, args.dpi)
-    plot_mean_std(div, layers, mean_std_path, model_short, args.mark_layers, args.dpi)
+    plot_figure(div, layers, args.legend_langs, pdf_path, args.mark_layers)
     write_csv(os.path.join(args.output_dir, "routing_divergence.csv"), div, layers)
     print_layer_summary(div, layers)
-    print(f"\nSaved: {png_path}\nSaved: {os.path.splitext(png_path)[0]}.pdf"
-          f"\nSaved: {mean_std_path}\nSaved: {os.path.splitext(mean_std_path)[0]}.pdf\nSaved: {json_path}")
+    print(f"\nSaved: {pdf_path}\nSaved: {json_path}")
 
 
 if __name__ == "__main__":
