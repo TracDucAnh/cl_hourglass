@@ -1,0 +1,27 @@
+# Python >= 3.10 (đã thử trên 3.12)
+# Cài:  pip install -r requirements.txt
+
+# --- lõi (mọi script) ---
+numpy>=1.24
+pandas>=2.0
+pyarrow>=14.0          # đọc parquet (XNLI, Belebele, OPUS-100)
+pyyaml>=6.0
+requests>=2.31
+tqdm>=4.66
+regex>=2023.10.3       # tách đơn vị Unicode (\p{L}, \p{M}) cho lọc rò rỉ 13-gram và đếm từ
+
+# --- tải dữ liệu từ Hugging Face (fetch.py: xnli, opus100, fineweb2, glotlid) ---
+huggingface_hub>=0.23
+datasets>=2.19         # chỉ dùng streaming FineWeb-2 / FineWeb
+
+# --- đặc trưng loại hình (build_typology.py) ---
+lang2vec>=1.1.2
+
+# --- tách từ cho bảng tần suất từ (build_typology.py wordfreq): zho, jpn, tha ---
+# Thiếu gói nào thì ngôn ngữ đó tự lùi về đếm theo ký tự (có ghi trong *.meta.json).
+jieba>=0.42.1
+janome>=0.5.0
+pythainlp>=5.0
+
+# --- KHÔNG cài ở đây (dùng ở study4_analysis, cần trình biên dịch C): ---
+#   eflomal   (pip install eflomal)  hoặc build từ https://github.com/robertostling/eflomal

@@ -1,0 +1,80 @@
+# =====================================================================
+# data/config.yaml  -  cấu hình duy nhất cho mọi script trong data/scripts
+# Các mục đánh dấu [XM] là tên/mã viết theo trí nhớ trong kế hoạch,
+# cần xác minh bằng:  python scripts/fetch.py --verify
+# =====================================================================
+
+seed: 42
+unicode_norm: NFKC
+
+# 12 ngôn ngữ của Study 1 / Study 4 (thứ tự theo kế hoạch, mục 4)
+study_languages: [eng, fra, rus, hin, zho, vie, tur, arb, jpn, fin, swh, tha]
+
+# Ngôn ngữ huấn luyện từ đầu (Study 2b) và các cấu hình lồng nhau
+configs:
+  L2: [fra, zho]
+  L4: [fra, zho, rus, tur]
+  L8: [fra, zho, rus, tur, hin, arb, vie, eng]
+
+# Ngôn ngữ chỉ để đếm tần suất từ (Study 4) - không dùng để huấn luyện
+wordfreq_languages: [eng, fra, rus, hin, zho, vie, tur, arb, jpn, fin, swh, tha]
+
+# Nhánh phụ π = 1% (OPUS-100, cặp en-xx), cấu hình L = 4
+opus_languages: [fra, zho, rus, tur]
+
+# Ngân sách dữ liệu đơn ngữ (mục 2b "Chuẩn bị dữ liệu")
+mono:
+  T_tokens: 1.0e9            # tổng token mỗi cấu hình
+  bytes_per_token_en: 4.0    # giả định để đổi token -> byte cho tiếng Anh;
+                             # chỉnh lại sau khi huấn luyện tokenizer (study3)
+  raw_margin: 1.25           # tải dư để bù phần bị lọc (trùng, ngắn, rò rỉ)
+  extra_bytes: 100000000     # byte/ngôn ngữ cho nhóm chỉ-đếm-tần-suất (jpn, fin, swh, tha)
+  min_chars: 50              # bỏ tài liệu ngắn hơn
+  shard_bytes: 100000000     # kích thước mỗi shard jsonl
+  leakage_ngram: 13
+
+sources:
+  flores_urls:               # [XM] thử lần lượt
+    - https://tinyurl.com/flores200dataset
+    - https://dl.fbaipublicfiles.com/nllb/flores200_dataset.tar.gz
+  flores_plus_repo: openlanguagedata/flores_plus      # [XM] có thể cần HF_TOKEN
+  ntrex_base: https://raw.githubusercontent.com/MicrosoftTranslator/NTREX/main
+  fineweb2_repo: HuggingFaceFW/fineweb-2
+  fineweb_repo: HuggingFaceFW/fineweb                 # chỉ cho tiếng Anh
+  fineweb_en_config: sample-10BT
+  opus100_repo: Helsinki-NLP/opus-100
+  xnli_repo: facebook/xnli
+  belebele_zip: https://dl.fbaipublicfiles.com/belebele/Belebele.zip
+  belebele_repo: facebook/belebele
+  muse_base: https://dl.fbaipublicfiles.com/arrival/dictionaries
+  glotlid_repo: cis-lmu/glotlid
+  ud_ref: r2.18              # tag phát hành UD (đã kiểm tra tồn tại cho 11 treebank)
+  wals_ref: v2020.6          # tag cldf-datasets/wals
+  xnli_train_size: 10000
+  belebele_questions: 200
+
+# ---------------------------------------------------------------------
+# Bảng mã theo ngôn ngữ. null = bộ dữ liệu đó không có ngôn ngữ này.
+#   flores      : mã FLORES-200
+#   flores_plus : mã trong flores_plus nếu khác (zho -> cmn_Hans)  [XM]
+#   ntrex       : mã tệp NTREX-128 (eng = tệp nguồn src.eng)
+#   xnli, muse  : mã ISO 639-1
+#   fineweb2    : tên config FineWeb-2 (eng dùng FineWeb)           [XM]
+#   ud          : repo treebank (một treebank mỗi ngôn ngữ)
+#   lang2vec    : mã URIEL (Quan thoại là cmn)
+#   wals        : mã ISO 639-3 trong WALS
+#   opus        : mã ISO 639-1 trong OPUS-100
+# ---------------------------------------------------------------------
+languages:
+  eng: {name: English,    flores: eng_Latn, ntrex: eng,    xnli: en, muse: en, fineweb2: null,      ud: UD_English-EWT,        lang2vec: eng, wals: eng, opus: en}
+  fra: {name: French,     flores: fra_Latn, ntrex: fra,    xnli: fr, muse: fr, fineweb2: fra_Latn,  ud: UD_French-GSD,         lang2vec: fra, wals: fra, opus: fr}
+  rus: {name: Russian,    flores: rus_Cyrl, ntrex: rus,    xnli: ru, muse: ru, fineweb2: rus_Cyrl,  ud: UD_Russian-GSD,        lang2vec: rus, wals: rus, opus: ru}
+  hin: {name: Hindi,      flores: hin_Deva, ntrex: hin,    xnli: hi, muse: hi, fineweb2: hin_Deva,  ud: UD_Hindi-HDTB,         lang2vec: hin, wals: hin, opus: hi}
+  zho: {name: Chinese,    flores: zho_Hans, flores_plus: cmn_Hans, ntrex: zho-CN, xnli: zh, muse: zh, fineweb2: cmn_Hani, ud: UD_Chinese-GSDSimp, lang2vec: cmn, wals: cmn, opus: zh}
+  vie: {name: Vietnamese, flores: vie_Latn, ntrex: vie,    xnli: vi, muse: vi, fineweb2: vie_Latn,  ud: UD_Vietnamese-VTB,     lang2vec: vie, wals: vie, opus: vi}
+  tur: {name: Turkish,    flores: tur_Latn, ntrex: tur,    xnli: tr, muse: tr, fineweb2: tur_Latn,  ud: UD_Turkish-IMST,        lang2vec: tur, wals: tur, opus: tr}
+  arb: {name: Arabic,     flores: arb_Arab, ntrex: arb,    xnli: ar, muse: ar, fineweb2: arb_Arab,  ud: UD_Arabic-PADT,         lang2vec: arb, wals: arb, opus: ar}
+  jpn: {name: Japanese,   flores: jpn_Jpan, ntrex: jpn,    xnli: null, muse: ja, fineweb2: jpn_Jpan, ud: UD_Japanese-GSD,       lang2vec: jpn, wals: jpn, opus: ja}
+  fin: {name: Finnish,    flores: fin_Latn, ntrex: fin,    xnli: null, muse: fi, fineweb2: fin_Latn, ud: UD_Finnish-TDT,        lang2vec: fin, wals: fin, opus: fi}
+  swh: {name: Swahili,    flores: swh_Latn, ntrex: swa,    xnli: sw, muse: null, fineweb2: swh_Latn, ud: null,                 lang2vec: swh, wals: swh, opus: sw}
+  tha: {name: Thai,       flores: tha_Thai, ntrex: tha,    xnli: th, muse: th, fineweb2: tha_Thai,  ud: UD_Thai-PUD,           lang2vec: tha, wals: tha, opus: th}

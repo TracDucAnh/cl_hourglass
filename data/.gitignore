@@ -1,0 +1,11 @@
+# dữ liệu lớn không đưa vào git; chỉ giữ thư mục rỗng (.gitkeep), config và manifest.json
+raw/*/*
+!raw/*/.gitkeep
+processed/*/*
+!processed/*/.gitkeep
+processed/*.npz
+__pycache__/
+*.pyc
+*.part
+*.tmp
+*.lock

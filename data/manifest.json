@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "description": "Nguồn, phiên bản, checksum của mọi bộ dữ liệu trong data/. Do scripts/*.py ghi tự động; không sửa tay.",
+  "xm_to_verify": [
+    "Tên bộ dữ liệu / repo HF (config.yaml > sources)",
+    "Mã config FineWeb-2 (config.yaml > languages.*.fineweb2), đặc biệt zho -> cmn_Hani",
+    "Mã tệp NTREX (đã kiểm tra ngày tạo skeleton: eng, fra, rus, hin, zho-CN, vie, tur, arb, jpn, fin, swa, tha)",
+    "URL tarball FLORES-200 và tên repo flores_plus (dự phòng)",
+    "Cấu trúc tệp của repo HF facebook/xnli và Helsinki-NLP/opus-100 (fetch.py --verify)"
+  ],
+  "raw": {},
+  "processed": {},
+  "verification": {}
+}
